@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-#set -ex
-
-source get_program_accounts.sh
+source "$(dirname "$0")"/get_program_accounts.sh
 
 usage() {
   exitcode=0
@@ -22,7 +20,6 @@ usage: $0 [options]
 
  Optional arguments:
    --url [cluster_rpc_url] - RPC URL for a running Solana cluster (Default: $RPC_URL)
-#   --output_dir [dir]      - Directory where output data files should be written (Default: $OUTPUT_DIR)
    --quiet                 - If set, do not print individual program account totals, only cluster-wide totals
 EOF
   exit $exitcode
@@ -101,8 +98,8 @@ function get_program_account_balance_totals {
 }
 
 function sum_account_balances_totals {
-  grandTotalAccountBalancesSol=$((systemAccountBalanceTotalSol + stakeAccountBalanceTotalSol + voteAccountBalanceTotalSol + configAccountBalanceTotalSol + storageAccountBalanceTotalSol))
   grandTotalAccountBalancesLamports=$((systemAccountBalanceTotalLamports + stakeAccountBalanceTotalLamports + voteAccountBalanceTotalLamports + configAccountBalanceTotalLamports + storageAccountBalanceTotalLamports))
+  grandTotalAccountBalancesSol=$((grandTotalAccountBalancesLamports / LAMPORTS_PER_SOL))
 
   printf "\n--- Total Token Distribution in all Account Balances ---\n"
   printf "Total SOL in all Account Balances: %'d\n" "$grandTotalAccountBalancesSol"
@@ -110,7 +107,6 @@ function sum_account_balances_totals {
 }
 
 RPC_URL=https://api.mainnet-beta.solana.com
-#OUTPUT_DIR="$(dirname "$0")"
 QUIET=
 
 while [[ -n $1 ]]; do
@@ -118,9 +114,6 @@ while [[ -n $1 ]]; do
     if [[ $1 = --url ]]; then
       RPC_URL="$2"
       shift 2
-#    elif [[ $1 = --output_dir ]]; then
-#      OUTPUT_DIR="$2"
-#      shift 2
     elif [[ $1 = --quiet ]]; then
       QUIET=true
       shift 1

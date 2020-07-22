@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-source get_program_accounts.sh
+source "$(dirname "$0")"/get_program_accounts.sh
 
 LAMPORTS_PER_SOL=1000000000 # 1 billion
 all_stake_accounts_json_file=all_stake_accounts_data.json
 all_stake_accounts_csv_file=all_stake_accounts_data.csv
+RPC_URL=http://api.mainnet-beta.solana.com
 
 usage() {
   exitcode=0
@@ -13,32 +14,43 @@ usage() {
     echo "Error: $*"
   fi
   cat <<EOF
-usage: $0 [cluster_rpc_url] [identity_pubkey]
+usage: $0 [identity_pubkey] [options]
 
  Report the account addresses, balances and lockups of all stake accounts
  for which a given key is the authorized staker.
  Also report the system account balance for that same key.
 
  Required arguments:
-   cluster_rpc_url  - RPC URL and port for a running Solana cluster (ex: http://34.83.146.144:8899)
    identity_pubkey  - Base58 pubkey that is an authorized staker for at least one stake account on the cluster.
+ Optional arguments:
+   --url [RPC_URL]                  - RPC URL and port for a running Solana cluster (default: $RPC_URL)
 EOF
   exit $exitcode
 }
 
-url=$1
-[[ -n $url ]] || usage
-shift
 filter_pubkey=$1
 [[ -n $filter_pubkey ]] || usage
 shift
+
+while [[ -n $1 ]]; do
+  if [[ ${1:0:2} = -- ]]; then
+    if [[ $1 = --url ]]; then
+      RPC_URL="$2"
+      shift 2
+    else
+      usage "Unknown option: $1"
+    fi
+  else
+    usage "Unknown option: $1"
+  fi
+done
 
 function parse_stake_account_data_to_file {
   account_key=$(echo "$1" | tr -d '"')
   filter_key="$2"
   csvfile="$3"
 
-  account_data="$(solana --url $url show-stake-account $account_key)"
+  account_data="$(solana --url $RPC_URL show-stake-account $account_key)"
   staker="$(echo "$account_data" | grep -i 'authorized staker' | cut -f3 -d " ")"
   lockup_epoch="$(echo "$account_data" | grep -i 'lockup epoch' | cut -f3 -d " ")"
   if [[ "$staker" == "$filter_key" ]] ; then
@@ -102,7 +114,7 @@ system_account_json_file=system_account_${filter_pubkey}.json
 echo "Program,Account_Pubkey,Lamports,Lockup_Epoch" > $results_file
 
 echo "Getting system account data"
-get_account_info $filter_pubkey $url $system_account_json_file
+get_account_info $filter_pubkey $RPC_URL $system_account_json_file
 system_account_balance="$(cat "$system_account_json_file" | jq -r '(.result | .value | .lamports)')"
 if [[ "$system_account_balance" == "null" ]]; then
   echo "The provided pubkey is not found in the system program: $filter_pubkey"
@@ -111,10 +123,10 @@ fi
 echo SYSTEM,$filter_pubkey,$system_account_balance,N/A >> $results_file
 
 echo "Getting all stake program accounts"
-get_program_accounts STAKE $STAKE_PROGRAM_PUBKEY $url $all_stake_accounts_json_file
+get_program_accounts STAKE $STAKE_PROGRAM_PUBKEY $RPC_URL $all_stake_accounts_json_file
 write_program_account_data_csv STAKE $all_stake_accounts_json_file $all_stake_accounts_csv_file
 
-echo "Querying cluster at $url for stake accounts with authorized staker: $filter_pubkey"
+echo "Querying cluster at $RPC_URL for stake accounts with authorized staker: $filter_pubkey"
 last_tick=$SECONDS
 {
 read
