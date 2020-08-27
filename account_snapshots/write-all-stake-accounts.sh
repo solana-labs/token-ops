@@ -19,13 +19,14 @@ usage: $0 [options]
  including their balance, authorities, delegation and lockup
 
  Optional arguments:
-   --url [RPC_URL]                  - RPC URL and port for a running Solana cluster (default: $RPC_URL)
-   --stake-address-file [FILEPATH]  - Path to a newline-separated file containing a list of stake account addresses of interest to collect.
-                                      If not provided, query and record all stake accounts on the cluster.  This takes a few minutes.
+   --url [RPC_URL]                        - RPC URL and port for a running Solana cluster (default: $RPC_URL)
+   -f | --stake-address-file [FILEPATH]   - Path to a newline-separated file containing a list of stake account addresses of interest to collect.
+                                            If not provided, query and record all stake accounts on the cluster.  This takes a few minutes.
 EOF
   exit $exitcode
 }
 
+shortArgs=()
 while [[ -n $1 ]]; do
   if [[ ${1:0:2} = -- ]]; then
     if [[ $1 = --url ]]; then
@@ -38,8 +39,20 @@ while [[ -n $1 ]]; do
       usage "Unknown option: $1"
     fi
   else
-    usage "Unknown option: $1"
+    shortArgs+=("$1")
+    shift
   fi
+done
+
+while getopts "f:" opt "${shortArgs[@]}"; do
+  case $opt in
+  f)
+    stake_address_file=$OPTARG
+    ;;
+  *)
+    usage "Error: unhandled option: $opt"
+    ;;
+  esac
 done
 
 results_file="stake_accounts_and_signers-${timestamp}.csv"
