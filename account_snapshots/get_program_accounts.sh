@@ -34,8 +34,8 @@ function write_program_account_data_csv {
     CSV_OUTFILE="${PROGRAM_NAME}_account_data.csv"
   fi
 
-  echo "account_address,lamports" > $CSV_OUTFILE
-  cat "$JSON_INFILE" | jq -r '(.result | .[]) | [.pubkey, (.account | .lamports)] | @csv' \
+  echo "program,account_address,balance" > $CSV_OUTFILE
+  cat "$JSON_INFILE" | jq -r --arg PROGRAM_NAME "$PROGRAM_NAME" '(.result | .[]) | [$PROGRAM_NAME, .pubkey, (.account | .lamports)/1000000000] | @csv' \
     >> $CSV_OUTFILE
 }
 
