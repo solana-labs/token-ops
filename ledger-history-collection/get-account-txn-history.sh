@@ -31,7 +31,22 @@ get_all_transaction_signatures() {
   address="$1"
   output_file="$2"
 
-  signature_list="$(RUST_LOG=solana=warn solana-ledger-tool -l . bigtable transaction-history $address)"
+  new_signature_list=$(curl -sX POST -H "Content-Type: application/json" -d \
+  '{"jsonrpc": "2.0","id":1,"method":"getConfirmedSignaturesForAddress2","params":["'$address'", {"limit": 1000}]}' $RPC_URL \
+  | jq -r '(.result | .[]) | .signature'
+  )
+  signature_list=$new_signature_list
+
+  while [[ "$(echo $new_signature_list | wc -w)" -eq 1000 ]]; do
+    earliest_txn=$(echo $new_signature_list | awk '{print $NF}')
+
+    new_signature_list=$(curl -sX POST -H "Content-Type: application/json" -d \
+    '{"jsonrpc": "2.0","id":1,"method":"getConfirmedSignaturesForAddress2","params":["'$address'", {"limit": 1000, "before": "'$earliest_txn'"}]}' $RPC_URL \
+    | jq -r '(.result | .[]) | .signature'
+    )
+    signature_list+=$'\n'
+    signature_list+=$new_signature_list
+  done
 
   reversed_sig_list=()
   while IFS=, read -r sig; do
