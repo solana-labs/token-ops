@@ -4,7 +4,7 @@
 # A list of all txn signatures involving this account, from genesis to present
 # Oldest transactions at the top of the list
 # Parse transaction details for each signature to csv, with fields:
-# txn_sig, slot, pre_balance, post_balance
+# txn_sig, error_status, slot, pre_balance, post_balance
 
 set -e
 
@@ -36,10 +36,7 @@ get_all_transaction_signatures() {
   signature_list=$new_signature_list
 
   while [[ "$(echo $new_signature_list | wc -w)" -eq 1000 ]]; do
-    echo "there are 1000 transactions"
     earliest_txn=$(echo $new_signature_list | awk '{print $NF}')
-
-    echo "earliest txn is $earliest_txn"
 
     new_signature_list=$(curl -sX POST -H "Content-Type: application/json" -d \
     '{"jsonrpc": "2.0","id":1,"method":"getConfirmedSignaturesForAddress2","params":["'$address'", {"limit": 1000, "before": "'$earliest_txn'"}]}' $RPC_URL \
