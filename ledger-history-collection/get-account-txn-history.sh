@@ -4,11 +4,9 @@
 # A list of all txn signatures involving this account, from genesis to present
 # Oldest transactions at the top of the list
 # Parse transaction details for each signature to csv, with fields:
-# txn_sig, slot, pre_balance, post_balance
+# txn_sig, error_status, slot, pre_balance, post_balance
 
 set -e
-
-RPC_URL=https://api.mainnet-beta.solana.com
 
 usage() {
   exitcode=0
@@ -17,10 +15,14 @@ usage() {
     echo "Error: $*"
   fi
   cat <<EOF
-usage: $0 [options] [address]
+usage: $0 [options] --address [address] | --address-file [address file]
+ Mandatory agruments:
+    Provide either --address OR --address-file
+    --address [address]                - A single account address for which you want the detailed transaction history
+    --address-file [address file]      - A newline-separated text file contianing a list of all addresses for which the history will be pulled.
 
  Optional arguments:
-    --url [RPC_URL]            - RPC URL and port for a running Solana cluster (default: $RPC_URL)
+    --url [RPC_URL]                    - RPC URL and port for a running Solana cluster (default: $RPC_URL)
 EOF
   exit $exitcode
 }
@@ -29,25 +31,7 @@ get_all_transaction_signatures() {
   address="$1"
   output_file="$2"
 
-  new_signature_list=$(curl -sX POST -H "Content-Type: application/json" -d \
-  '{"jsonrpc": "2.0","id":1,"method":"getConfirmedSignaturesForAddress2","params":["'$address'", {"limit": 1000}]}' $RPC_URL \
-  | jq -r '(.result | .[]) | .signature'
-  )
-  signature_list=$new_signature_list
-
-  while [[ "$(echo $new_signature_list | wc -w)" -eq 1000 ]]; do
-    echo "there are 1000 transactions"
-    earliest_txn=$(echo $new_signature_list | awk '{print $NF}')
-
-    echo "earliest txn is $earliest_txn"
-
-    new_signature_list=$(curl -sX POST -H "Content-Type: application/json" -d \
-    '{"jsonrpc": "2.0","id":1,"method":"getConfirmedSignaturesForAddress2","params":["'$address'", {"limit": 1000, "before": "'$earliest_txn'"}]}' $RPC_URL \
-    | jq -r '(.result | .[]) | .signature'
-    )
-    signature_list+=$'\n'
-    signature_list+=$new_signature_list
-  done
+  signature_list="$(RUST_LOG=solana=warn solana-ledger-tool -l . bigtable transaction-history $address)"
 
   reversed_sig_list=()
   while IFS=, read -r sig; do
@@ -56,7 +40,7 @@ get_all_transaction_signatures() {
 
   echo "$reversed_sig_list" > $output_file
   total_txns=$(cat $output_file | wc -l | awk '{print $1}')
-  echo "There are $total_txns transactions for $address"
+  echo "Found $total_txns transactions for $address"
 }
 
 write_transaction_details_to_file() {
@@ -98,11 +82,61 @@ write_transaction_details_to_file() {
   } < "$input_file"
 }
 
-address="$1"
-[[ -n $address ]] || usage "Must provide an address"
+get_account_txn_history() {
+  out_dir="$1"
+  addr="$2"
 
-signature_file=txn_sigs_$address
-account_history_csv=account_history_$address.csv
+  signature_file=$out_dir/txn_sigs_$addr.csv
+  account_history_csv=$out_dir/account_history_$addr.csv
 
-get_all_transaction_signatures $address $signature_file
-write_transaction_details_to_file $signature_file $account_history_csv
+  echo "Finding all transaction signatures for $address"
+  get_all_transaction_signatures $addr $signature_file
+
+  echo "Parsing all transaction details for $address"
+  write_transaction_details_to_file $signature_file $account_history_csv
+}
+
+export GOOGLE_APPLICATION_CREDENTIALS=~/mainnet-beta-bigtable-ro.json
+RPC_URL=https://api.mainnet-beta.solana.com
+timestamp="$(date -u +"%Y-%m-%d_%H:%M:%S")"
+
+address=
+address_file=
+
+while [[ -n $1 ]]; do
+  if [[ ${1:0:2} = -- ]]; then
+    if [[ $1 = --url ]]; then
+      RPC_URL="$2"
+      shift 2
+    elif [[ $1 = --address ]]; then
+      address="$2"
+      shift 2
+    elif [[ $1 = --address-file ]]; then
+      address_file="$2"
+      shift 2
+    else
+      usage "Unknown option: $1"
+    fi
+  else
+    usage "Unknown option: $1"
+  fi
+done
+
+if [[ -n $address && -n $address_file ]]; then
+  usage "Cannot provide both --address AND --address-file"
+elif [[ -z $address && -z $address_file ]]; then
+  usage "Must provide --address OR --address-file"
+fi
+
+output_dir="account_histories-${timestamp}"
+mkdir -p $output_dir
+
+if [[ -n $address_file ]]; then
+  {
+  while IFS=, read -r address; do
+    get_account_txn_history "$output_dir" "$address"
+  done
+  } < "$address_file"
+else
+  get_account_txn_history "$output_dir" "$address"
+fi
