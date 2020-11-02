@@ -64,5 +64,7 @@ slot="$(solana slot)"
 echo "Checking system accounts at $timestamp, and slot: $slot"
 get_program_accounts SYSTEM $SYSTEM_PROGRAM_PUBKEY $RPC_URL $json_file
 
-echo "Writing all system account data to: $output_csv"
+echo "Writing all system account data to: $output_csv..."
 write_program_account_data_csv SYSTEM $json_file $output_csv
+
+echo "Finished"

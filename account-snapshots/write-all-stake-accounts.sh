@@ -68,6 +68,8 @@ while getopts "o:" opt "${shortArgs[@]}"; do
   esac
 done
 
+echo "Writing stake account data to $output_csv..."
+
 all_stake_accounts_file="all_stake_accounts-${timestamp}"
 solana stakes --url $RPC_URL > "$all_stake_accounts_file"
 slot="$(solana slot --url $RPC_URL)"
@@ -88,4 +90,4 @@ while IFS=, read -r line; do
 done
 } < "$all_stake_accounts_file"
 
-echo "Wrote all stake accounts to $output_csv"
+echo "Finished"
