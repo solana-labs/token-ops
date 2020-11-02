@@ -19,7 +19,7 @@ usage: $0 [options] --address [address] | --address-file [address file]
  Mandatory agruments:
     Provide either --address OR --address-file
     --address [address]                - A single account address for which you want the detailed transaction history
-    --address-file [address file]      - A newline-separated text file contianing a list of all addresses for which the history will be pulled.
+    --address-file [address file]      - A newline-separated text file containing a list of all addresses for which the history will be pulled.
 
  Optional arguments:
     --url [RPC_URL]                    - RPC URL and port for a running Solana cluster (default: $RPC_URL)
@@ -47,7 +47,13 @@ write_transaction_details_to_file() {
   input_file="$1"
   output_csv="$2"
 
-  echo "slot,signature,err,pre_balance,post_balance" > "$output_csv"
+  header="slot,signature,err,target_addr,target_pre,target_post,target_change,"
+  header="${header}0_addr,0_pre,0_post,0_change,1_addr,1_pre,1_post,1_change,"
+  header="${header}2_addr,2_pre,2_post,2_change,3_addr,3_pre,3_post,3_change,"
+  header="${header}4_addr,4_pre,4_post,4_change,5_addr,5_pre,5_post,5_change,"
+  header="${header}6_addr,6_pre,6_post,6_change,7_addr,7_pre,7_post,7_change,"
+
+  echo "$header" > "$output_csv"
   {
   while IFS=, read -r signature; do
     [[ -n $signature ]] || break
@@ -65,19 +71,32 @@ write_transaction_details_to_file() {
     pre_balances_array=(${pre_balances})
     post_balances_array=(${post_balances})
 
+    output_string="$slot,$signature,$err,$address,"
+    additional_account_balances_string=""
+
     len=${#accounts_array[*]}
     for (( i=0; i<${len} ; i++ )); do
       if [[ "${accounts_array[$i]}" = "$address" ]]; then
-        pre_balance_lamports=${pre_balances_array[$i]}
-        post_balance_lamports=${post_balances_array[$i]}
-        break
+        target_pre_balance_lamports=${pre_balances_array[$i]}
+        target_post_balance_lamports=${post_balances_array[$i]}
+        target_pre_balance=$((target_pre_balance_lamports / 1000000000))
+        target_post_balance=$((target_post_balance_lamports / 1000000000))
+        target_change=$((target_post_balance - target_pre_balance))
+      else
+        other_pre_balance_lamports=${pre_balances_array[$i]}
+        other_post_balance_lamports=${post_balances_array[$i]}
+        other_pre_balance=$((other_pre_balance_lamports / 1000000000))
+        other_post_balance=$((other_post_balance_lamports / 1000000000))
+        other_change=$((other_post_balance - other_pre_balance))
+        additional_account_balances_string="${additional_account_balances_string}${accounts_array[$i]},${other_pre_balance},${other_post_balance},${other_change},"
       fi
     done
 
-    pre_balance=$((pre_balance_lamports / 1000000000))
-    post_balance=$((post_balance_lamports / 1000000000))
+    if [[ len > 0 ]]; then
+      output_string="${output_string}${target_pre_balance},${target_post_balance},${target_change},${additional_account_balances_string}"
+    fi
 
-    echo "$slot,$signature,$err,$pre_balance,$post_balance" >> $output_csv
+    echo "$output_string" >> $output_csv
   done
   } < "$input_file"
 }
