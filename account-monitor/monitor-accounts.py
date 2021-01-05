@@ -6,6 +6,7 @@ import logging
 import json
 import argparse
 import pathlib
+import os
 
 
 def write_balances_to_file(balances, filename):
@@ -166,10 +167,14 @@ def main():
 
     account_info = get_dict_from_csv(args.input_file)
     addresses = list(account_info.keys())
-    old_balances = read_balances_from_file(args.balances_file)
 
-    send_message_to_slack("Starting account monitoring with the following known balances:", args.slack_webhook_url)
-    publish_all_balances_to_slack(old_balances, args.slack_webhook_url)
+    old_balances = None
+    if os.path.isfile(args.balances_file):
+        old_balances = read_balances_from_file(args.balances_file)
+
+    if args.slack_webhook_url is not None:
+        send_message_to_slack("Starting account monitoring with the following known balances:", args.slack_webhook_url)
+        publish_all_balances_to_slack(old_balances, args.slack_webhook_url)
 
     liveness_time = time.time()
 
@@ -179,7 +184,9 @@ def main():
                       "Time since last balance update: %d seconds" % \
                       (args.balance_check_interval,
                        time.time() - pathlib.Path(args.balances_file).stat().st_mtime)
-            send_message_to_slack(message, args.slack_webhook_url)
+            logging.info(message)
+            if args.slack_webhook_url is not None:
+                send_message_to_slack(message, args.slack_webhook_url)
             liveness_time = time.time()
 
         latest_balances = get_latest_balances(addresses, args.rpc_url, args.slack_webhook_url)
