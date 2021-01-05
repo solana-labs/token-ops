@@ -168,7 +168,7 @@ def main():
     account_info = get_dict_from_csv(args.input_file)
     addresses = list(account_info.keys())
 
-    old_balances = None
+    old_balances = {}
     if os.path.isfile(args.balances_file):
         old_balances = read_balances_from_file(args.balances_file)
 
