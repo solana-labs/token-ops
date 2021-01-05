@@ -198,23 +198,29 @@ def main():
         old_balances = read_balances_from_file(args.balances_file)
 
     if args.slack_webhook_url is not None:
-        send_message_to_slack("Starting account monitoring "
-                              "with the following known balances:",
+        send_message_to_slack("Starting up account monitor",
                               args.slack_webhook_url)
-        publish_all_balances_to_slack(old_balances, args.slack_webhook_url)
 
-    liveness_time = time.time()
-
+    liveness_time = 0
     while True:
         if time.time() - liveness_time >= args.liveness_check_interval:
-            message = "Liveness Check interval: %d seconds\n" \
+            message = "Liveness Check Stats\n" \
+                      "--------------------\n" \
+                      "Liveness check interval: %d seconds\n" \
                       "Balance check interval: %d seconds\n" \
-                      "Time since last balance update: %d seconds" % \
+                      "Time since last balance update: %d seconds\n" \
+                      "--------------------\n" \
+                      "Number of accounts monitored: %d\n" \
+                      "Total SOL balance of all accounts at last check: %d\n" \
+                      "--------------------" % \
                       (args.liveness_check_interval,
                        args.balance_check_interval,
                        time.time() -
-                       pathlib.Path(args.balances_file).stat().st_mtime)
+                       pathlib.Path(args.balances_file).stat().st_mtime,
+                       len(addresses),
+                       sum(old_balances.values()))
             logging.info(message)
+
             if args.slack_webhook_url is not None:
                 send_message_to_slack(message, args.slack_webhook_url)
             liveness_time = time.time()
