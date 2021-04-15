@@ -34,7 +34,7 @@ function write_stake_info_to_csv {
   withdraw_authority="$(echo "$stake_account_info" | grep "Withdraw Authority" | awk '{ print $3 }')"
   balance="$(echo "$stake_account_info" | grep "Balance" | awk '{ print $2 }')"
   delegated_to="$(echo "$stake_account_info" | grep "Delegated Vote Account Address" | awk '{ print $5 }')"
-  lockup_timestamp="$(echo "$stake_account_info" | grep "Lockup Timestamp" | awk -F '[ )]' '{ print $5 }')"
+  lockup_timestamp="$(echo "$stake_account_info" | grep "Lockup Timestamp" | awk '{ print $3 }')"
 
   echo "STAKE,$stake_account_address,$balance,$stake_authority,$withdraw_authority,$delegated_to,$lockup_timestamp,$slot" >> $output_csv
 }
